@@ -14,3 +14,30 @@ provider:
   runtime: nodejs12.x
   stage: prod
   region: eu-west-2
+
+  # These environment variables are made available to our functions
+  # under process.env.
+  environment:
+    bungieApiKey: ${env:BUNGIE_X_API_KEY}
+
+  # 'iamRoleStatements' defines the permission policy for the Lambda function.
+  iamRoleStatements:
+    - Effect: 'Allow'
+      Action:
+        - logs:*
+      Resource: "arn:aws:logs:*:*:*"
+
+functions:
+  stats:
+    handler: stats.main
+    events:
+      - http:
+          path: stats
+          method: get
+          cors: true
+          authorizer: aws_iam
+
+# Create our resources with separate CloudFormation templates
+resources:
+# API Gateway Errors
+  - ${file(resources/api-gateway-errors.yml)}
