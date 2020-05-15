@@ -1,7 +1,5 @@
-import "./enums.js";
 import "./libs/algorithms-lib.js";
 import { calculateKD, calculateKAD } from "./libs/algorithms-lib.js";
-
 
 export async function main(event, context, callback) {
 

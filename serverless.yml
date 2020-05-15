@@ -28,11 +28,11 @@ provider:
       Resource: "arn:aws:logs:*:*:*"
 
 functions:
-  stats:
-    handler: stats.main
+  get:
+    handler: get.main
     events:
       - http:
-          path: stats
+          path: get
           method: get
           cors: true
           authorizer: aws_iam
