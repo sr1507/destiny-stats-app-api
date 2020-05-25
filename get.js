@@ -1,88 +1,77 @@
 import "./libs/algorithms-lib.js";
-import { calculateKD, calculateKAD } from "./libs/algorithms-lib.js";
+import {calculateKD, calculateKAD, getTotals} from "./libs/algorithms-lib.js";
 
 export async function main(event, context, callback) {
 
   const axios = require('axios');
-
-  const responseHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Credentials": true
-  };
-
-  const input = JSON.parse(event);
-  //const input = {};
-  //input.membershipType = 2;
-  //input.displayName = "SoJ--9";
 
   let config = {
     'X-API-KEY': process.env.bungieApiKey
   };
 
   const rootPath = "https://www.bungie.net/Platform/Destiny2/";
+  console.log(event.queryStringParameters);
+  const membershipType = event.queryStringParameters.membershipType;
+  const membershipId = event.queryStringParameters.membershipId;
 
-  var membershipId = getMembershipId(input.membershipType, input.displayName);
-  var characterIds = getCharacterIds(input.membershipType, membershipId);
-
-    var mode = 5;
-    var page = 0;
-    var accountActivities = {};
-
-    for (var id in characterIds) {
-      var characterActivities = getCharacterActivities(input.membershipType, membershipId, id, mode, page);
-        accountActivities.push(characterActivities);
-      }
-
+  await axios.get(rootPath + membershipType + "/Profile/" + membershipId + "/?components=100", {headers: config}).then(profileResponse => getProfileActivities(profileResponse)).then(profileActivities => {
     var statsResponse = {};
-    statsResponse.killsDeathsRatio = calculateKD(accountActivities);
-    statsResponse.killsAssistsDeathsRatio = calculateKAD(accountActivities);
+    statsResponse.totals = getTotals(profileActivities);
+    statsResponse.killsDeathsRatio = calculateKD(statsResponse.totals);
+    statsResponse.killsAssistsDeathsRatio = calculateKAD(statsResponse.totals);
 
-    // Return status code 200 and the newly created item
-    const apiResponse = {
-      statusCode: 200,
-      headers: responseHeaders,
-      body: statsResponse
+    var apiResponse = {
+      "isBase64Encoded": false,
+      "statusCode": 200,
+      "headers": { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": true },
+      "body": JSON.stringify(statsResponse)
     };
     callback(null, apiResponse);
+  }).catch(e => {
 
-  async function getMembershipId(membershipType, displayName){
-    var searchURL = rootPath + "SearchDestinyPlayer/" + membershipType + "/" + displayName + "/";
-    await axios.get(searchURL, {headers: config}).then(searchResponse => {
-      if (!searchResponse.data.Response.membershipId) {
-        throw new Error("Destiny player not found.");
-      }
+    console.log(e);
+    callback(e);
+  });
 
-      console.log("Data=" + JSON.stringify(searchResponse.data.Response));
-      return searchResponse.data.Response.membershipId;
+  function getProfileActivities(profileResponse) {
+    return new Promise((resolve, reject) => {
+      Promise.all(getCharacterActivityPromises(profileResponse.data.Response.profile.data.characterIds)).then(responseArray => {
+        var profileActivities = [];
+        for (var i = 0; i < responseArray.length; i++) {
+          profileActivities = profileActivities.concat(responseArray[i]);
+        }
+        resolve(profileActivities);
+      });
     });
   }
 
-  async function getCharacterIds(membershipType, membershipId){
-    var profileURL = rootPath + membershipType + "/Profile/" + membershipId + "/?components=100";
-
-    await axios.get(profileURL, {headers: config}).then(profileResponse => {
-    if (!profileResponse.data.Response.profile.data.characterIds) {
-      throw new Error("Profile not found.");
+  function getCharacterActivityPromises(characterIds) {
+    var characterActivityPromises = [];
+    for (var i = 0; i < characterIds.length; i++) {
+      const characterActivityPromise = new Promise((resolve, reject) => {
+        var character = {};
+        character.characterId = characterIds[i];
+        getCharacterActivities(characterIds[i]).then((characterActivities) => {
+          character.activities = characterActivities;
+          resolve(character);
+        });
+      });
+      characterActivityPromises.push(characterActivityPromise);
     }
-    console.log("Data=" + JSON.stringify(profileResponse.data.Response));
-
-    return profileResponse.data.Response.profile.data.characterIds;
-    });
+    return characterActivityPromises;
   }
 
-  async function getCharacterActivities(membershipType, membershipId, characterId, mode, page){
-    var activityHistoryURL = rootPath + membershipType + "/Account/"+ membershipId + "/Character/" + characterId + "/Stats/Activities/?count=250&mode=" + mode + "&page=" + page;
-
-    await axios.get(activityHistoryURL, {headers: config}).then(activitiesResponse => {
-      if (!activitiesResponse.data.Response.activities) {
-         throw new Error("Activities not found.");
-      }
-
-      var characterActivities = {};
-      characterActivities.characterId = characterId;
-      characterActivities.activities = activitiesResponse.data.Response.activities;
-
-      return characterActivities;
+  function getCharacterActivities(characterId, page = 0, activities = []) {
+    return new Promise((resolve, reject) => {
+      const url = rootPath + membershipType + "/Account/" + membershipId + "/Character/" + characterId + "/Stats/Activities/?count=250&mode=5&page=" + page;
+      axios.get(url, {headers: config}).then(activitiesResponse => {
+        if (activitiesResponse.data.Response.activities) {
+          activities = activities.concat(activitiesResponse.data.Response.activities);
+          resolve(getCharacterActivities(characterId, ++page, activities));
+        } else {
+          resolve(activities);
+        }
+      });
     });
   }
 }
