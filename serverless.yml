@@ -36,7 +36,6 @@ functions:
           path: get
           method: get
           cors: true
-          authorizer: aws_iam
 
   search:
     handler: search.main
@@ -45,7 +44,6 @@ functions:
           path: search
           method: get
           cors: true
-          authorizer: aws_iam
 
 # Create our resources with separate CloudFormation templates
 resources:
