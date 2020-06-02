@@ -1,11 +1,11 @@
 import "./libs/algorithms-lib.js";
-import { calculateKD, calculateKAD, getTotals } from "./libs/algorithms-lib.js";
 import moment from "moment";
-import { findIndexOfEarliestActivityWithinStartDate } from "./libs/utilities-lib.js";
+import { findIndexOfEarliestActivityWithinStartDate, buildStats } from "./libs/utilities-lib.js";
 
 export async function main(event, context, callback) {
-
   const axios = require("axios");
+
+  var accountProfile = { characters: [], stats: {} };
 
   let config = {
     "X-API-KEY": process.env.bungieApiKey,
@@ -17,51 +17,68 @@ export async function main(event, context, callback) {
   const startDate = moment(event.queryStringParameters.startDate);
 
   await axios
-    .get(rootPath + membershipType + "/Profile/" + membershipId + "/?components=100", { headers: config })
+    .get(rootPath + membershipType + "/Profile/" + membershipId + "/?components=200", { headers: config })
     .then((profileResponse) => getProfileActivities(profileResponse))
-    .then((profileActivities) => {
-      var statsResponse = {};
-      statsResponse.totals = getTotals(profileActivities);
-      statsResponse.killsDeathsRatio = calculateKD(statsResponse.totals);
-      statsResponse.killsAssistsDeathsRatio = calculateKAD(statsResponse.totals);
-
+    .then(() => {
       var apiResponse = {
         isBase64Encoded: false,
         statusCode: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": true },
-        body: JSON.stringify(statsResponse),
+        body: JSON.stringify(accountProfile),
       };
 
-
       callback(null, apiResponse);
-    })
-    .catch((e) => {
+    }).catch((e) => {
       console.log(e);
       callback(e);
     });
 
   function getProfileActivities(profileResponse) {
     return new Promise((resolve, reject) => {
-      Promise.all(getCharacterActivityPromises(profileResponse.data.Response.profile.data.characterIds)).then((responseArray) => {
+      Promise.all(getCharacterActivityPromises(profileResponse)).then((characterProfileArray) => {
         var profileActivities = [];
-        for (var i = 0; i < responseArray.length; i++) {
-          profileActivities = profileActivities.concat(responseArray[i]);
+        for (var i = 0; i < characterProfileArray.length; i++) {
+          profileActivities = profileActivities.concat(characterProfileArray[i].activities);
+          delete characterProfileArray[i].activities;
         }
-        resolve(profileActivities);
+        accountProfile.stats = buildStats(profileActivities);
+        accountProfile.characters = characterProfileArray;
+        resolve();
+      }).catch((e) => {
+        console.log(e.message);
+        throw(e);
       });
     });
   }
 
-  function getCharacterActivityPromises(characterIds) {
+  function getCharacterActivityPromises(profileResponse) {
+    var characterIds = Object.keys(profileResponse.data.Response.characters.data);
     var characterActivityPromises = [];
     for (var i = 0; i < characterIds.length; i++) {
       const characterActivityPromise = new Promise((resolve, reject) => {
         var character = {};
         character.characterId = characterIds[i];
         getCharacterActivities(characterIds[i], startDate).then((characterActivities) => {
-          character.activities = characterActivities;
-          resolve(character);
+          var destinyClass = ["Titan", "Hunter", "Warlock"];
+          var characterProfile = {};
+          var characterData = profileResponse.data.Response.characters.data[character.characterId];
+
+          characterProfile.characterID = character.characterId;
+          characterProfile.emblem = "bungie.net" + characterData.emblemBackgroundPath;
+          characterProfile.light = characterData.light;
+          characterProfile.level = characterData.baseCharacterLevel;
+          characterProfile.destinyClass = destinyClass[characterData.classType];
+          characterProfile.stats = buildStats(characterActivities);
+          characterProfile.activities = characterActivities;
+
+          resolve(characterProfile);
+        }).catch((e) => {
+          console.log(e.message);
+          throw(e);
         });
+      }).catch((e) => {
+        console.log(e.message);
+        throw(e);
       });
       characterActivityPromises.push(characterActivityPromise);
     }
@@ -71,7 +88,7 @@ export async function main(event, context, callback) {
   function getCharacterActivities(characterId, startDate, page = 0, activities = []) {
     return new Promise((resolve, reject) => {
       const url = rootPath + membershipType + "/Account/" + membershipId + "/Character/" + characterId + "/Stats/Activities/?count=250&mode=5&page=" + page;
-      axios.get(url, {headers: config}).then((activitiesResponse) => {
+      axios.get(url, { headers: config }).then((activitiesResponse) => {
         var activityDate = {};
         if (activitiesResponse.data.Response.activities) {
           activityDate = moment(activitiesResponse.data.Response.activities[activitiesResponse.data.Response.activities.length - 1].period);
@@ -91,7 +108,13 @@ export async function main(event, context, callback) {
           // No activities returned on page
           resolve(activities);
         }
+      }).catch((e) => {
+        console.log(e.message);
+        throw(e);
       });
+    }).catch((e) => {
+      console.log(e.message);
+      throw(e);
     });
   }
 }
