@@ -54,7 +54,7 @@ export async function main(event, context, callback) {
   function getCharacterActivityPromises(profileResponse) {
     var characterIds = Object.keys(profileResponse.data.Response.characters.data);
     var characterActivityPromises = [];
-    for (var i = 0; i < characterIds.length; i++) {
+      for (var i = 0; i < characterIds.length; i++) {
       const characterActivityPromise = new Promise((resolve, reject) => {
         var character = {};
         character.characterId = characterIds[i];
@@ -89,14 +89,16 @@ export async function main(event, context, callback) {
     return new Promise((resolve, reject) => {
       const url = rootPath + membershipType + "/Account/" + membershipId + "/Character/" + characterId + "/Stats/Activities/?count=250&mode=5&page=" + page;
       axios.get(url, { headers: config }).then((activitiesResponse) => {
-        var activityDate = {};
-        if (activitiesResponse.data.Response.activities) {
-          activityDate = moment(activitiesResponse.data.Response.activities[activitiesResponse.data.Response.activities.length - 1].period);
-          if (activityDate.isBefore(startDate)) {
-            // Only some of the activities on this page can be used
-            var finalIndex = findIndexOfEarliestActivityWithinStartDate(activitiesResponse.data.Response.activities, startDate);
-            if (finalIndex >= 0) {
-              activities = activities.concat(activitiesResponse.data.Response.activities.slice(0, finalIndex + 1));
+        if (activitiesResponse.data.Response.activities && activitiesResponse.data.Response.activities.length > 0) {
+          var lastActivityDateOnPage = moment(activitiesResponse.data.Response.activities[activitiesResponse.data.Response.activities.length - 1].period);
+          var firstActivityDateOnPage = moment(activitiesResponse.data.Response.activities[0].period);
+          if (lastActivityDateOnPage.isBefore(startDate)) {
+            if (!firstActivityDateOnPage.isBefore(startDate)) {
+              // Only some of the activities on this page can be used
+              var finalIndex = findIndexOfEarliestActivityWithinStartDate(activitiesResponse.data.Response.activities, startDate);
+              if (finalIndex >= 0) {
+                activities = activities.concat(activitiesResponse.data.Response.activities.slice(0, finalIndex + 1));
+              }
             }
             resolve(activities);
           } else {
