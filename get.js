@@ -59,7 +59,9 @@ export async function main(event, context, callback) {
         var character = {};
         character.characterId = characterIds[i];
         getCharacterActivities(characterIds[i], startDate).then((characterActivities) => {
-          var destinyClass = ["Titan", "Hunter", "Warlock"];
+          var destinyClass = ["Titan", "Hunter", "Warlock", ""];
+          var destinyRace = ["Human", "Awoken", "Exo", ""];
+          var destinyGender = ["Male", "Female", ""];
           var characterProfile = {};
           var characterData = profileResponse.data.Response.characters.data[character.characterId];
 
@@ -68,6 +70,8 @@ export async function main(event, context, callback) {
           characterProfile.light = characterData.light;
           characterProfile.level = characterData.baseCharacterLevel;
           characterProfile.destinyClass = destinyClass[characterData.classType];
+          characterProfile.destinyRace = destinyRace[characterData.raceType];
+          characterProfile.destinyGender = destinyGender[characterData.genderType];
           characterProfile.stats = buildStats(characterActivities);
           characterProfile.activities = characterActivities;
 
