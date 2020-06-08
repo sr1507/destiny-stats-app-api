@@ -20,6 +20,8 @@ provider:
   # under process.env.
   environment:
     bungieApiKey: ${env:BUNGIE_X_API_KEY}
+    smokeTestDisplayName: ${env:SMOKE_TEST_DISPLAY_NAME}
+    smokeTestAltDisplayName: ${env:SMOKE_TEST_ALT_DISPLAY_NAME}
 
   # 'iamRoleStatements' defines the permission policy for the Lambda function.
   iamRoleStatements:
