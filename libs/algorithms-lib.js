@@ -16,7 +16,7 @@ export function calculateEfficiency(totals) {
 
   for (var mode of totals.gamemodeList) {
     if (totals.deaths[mode] == 0) {
-      KADs.mode = totals.kills[mode] + totals.assists[mode];
+      KADs[mode] = totals.kills[mode] + totals.assists[mode];
     } else {
       KADs[mode] = round((totals.kills[mode] + totals.assists[mode]) / totals.deaths[mode]);
     }
@@ -30,7 +30,7 @@ export function calculateKDAs(totals) {
 
   for (var mode of totals.gamemodeList) {
     if (totals.deaths[mode] == 0) {
-      KADs.mode = totals.kills[mode] + totals.assists[mode];
+      KADs[mode] = totals.kills[mode] + totals.assists[mode];
     } else {
       KADs[mode] = round((totals.kills[mode] + totals.assists[mode] / 2) / totals.deaths[mode]);
     }
